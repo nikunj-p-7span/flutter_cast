@@ -14,29 +14,33 @@ class CastDiscoveryService {
     return _instance;
   }
 
+
   Future<List<CastDevice>> search({Duration timeout = const Duration(seconds: 5)}) async {
     final results = <CastDevice>[];
 
     final discovery = BonsoirDiscovery(type: _domain);
-    await discovery.ready;
 
-    discovery.eventStream!.listen((event) {
-      if (event.type == BonsoirDiscoveryEventType.discoveryServiceFound) {
-        event.service?.resolve(discovery.serviceResolver);
-      } else if (event.type == BonsoirDiscoveryEventType.discoveryServiceResolved) {
-        if (event.service == null || event.service?.attributes == null) {
+    discovery.eventStream?.listen((event) {
+      final service = event.service;
+
+      if (event is BonsoirDiscoveryServiceFoundEvent) {
+        service?.resolve(discovery.serviceResolver);
+      } else if (event is BonsoirDiscoveryServiceResolvedEvent) {
+        if (service == null || service.attributes == null) {
           return;
         }
 
-        final port = event.service?.port;
-        final host = event.service?.toJson()['service.ip'] ?? event.service?.toJson()['service.host'];
+        final port = service.port;
+        final serviceJson = service.toJson();
+        final host = serviceJson['service.ip'] ?? serviceJson['service.host'];
 
         String name = [
-          event.service?.attributes?['md'],
-          event.service?.attributes?['fn'],
+          service.attributes['md'],
+          service.attributes['fn'],
         ].whereType<String>().join(' - ');
+
         if (name.isEmpty) {
-          name = event.service!.name;
+          name = service.name;
         }
 
         if (port == null || host == null) {
@@ -45,11 +49,11 @@ class CastDiscoveryService {
 
         results.add(
           CastDevice(
-            serviceName: event.service!.name,
+            serviceName: service.name,
             name: name,
             port: port,
             host: host,
-            extras: event.service!.attributes ?? {},
+            extras: service.attributes ?? {},
           ),
         );
       }
@@ -63,4 +67,5 @@ class CastDiscoveryService {
 
     return results.toSet().toList();
   }
+
 }
